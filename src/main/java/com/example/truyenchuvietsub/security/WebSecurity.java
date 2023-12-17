@@ -60,7 +60,14 @@ public class WebSecurity {
                         .requestMatchers("/api/comment/*").authenticated()
                         .anyRequest().permitAll()
                 )
-                .cors((cors) -> cors.disable())
+                .cors(cors -> cors
+                        .configurationSource(request -> {
+                            var corsConfiguration = new org.springframework.web.cors.CorsConfiguration();
+                            corsConfiguration.setAllowedOrigins(java.util.List.of("http://localhost:5173", "http://vietlinhtinh-production.up.railway.app"));
+                            corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE"));
+                            corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
+                            return corsConfiguration;
+                        }))
                 .oauth2ResourceServer((oauth2) -> oauth2
                         .authenticationEntryPoint(new BearerTokenAuthenticationEntryPoint())
                         .accessDeniedHandler(new BearerTokenAccessDeniedHandler())
