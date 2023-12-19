@@ -21,5 +21,5 @@ public class Comment {
     private User user;
     @DBRef
     private Chapter chapter;
-    private Date createAt = new Date();
+    private Date createdAt = new Date();
 }

@@ -1,6 +1,7 @@
 package com.example.truyenchuvietsub.service;
 
 import com.example.truyenchuvietsub.SlugGenerator;
+import com.example.truyenchuvietsub.dto.series.HotSeries;
 import com.example.truyenchuvietsub.dto.SeriesDTO;
 import com.example.truyenchuvietsub.dto.ReviewDTO;
 import com.example.truyenchuvietsub.dto.UserDTO;
@@ -12,8 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.core.Authentication;
@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Service
 public class SeriesService {
@@ -94,6 +95,7 @@ public class SeriesService {
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.lookup("chapters", "chapter.$id", "_id", "chapter"),
                 Aggregation.unwind("chapter"),
+//                Aggregation.group("chapter.series.$id")
                 Aggregation.group("chapter.series.$id")
                         .count().as("totalLikes"),
                 Aggregation.sort(Sort.Direction.DESC, "totalLikes"),
@@ -104,15 +106,55 @@ public class SeriesService {
         List<SeriesDTO> seriesDTOS = new ArrayList<>();
         for (Document document : topSeriesWithHighestLikes) {
             Series series = mongoTemplate.findById(document.get("_id"), Series.class);
+            assert series != null;
             seriesDTOS.add(SeriesDTO.from(
                     series,
-                    chapterService.countChaptersBySeries_Slug(series.getSlug()),
-                    countTotalViewBySeriesId(series.getId()),
-                    countTotalLikeBySeriesId(series.getId()),
-                    getReviewsBySeriesId(series.getId())
+                    0,
+                    0,
+                    0,
+                    null
             ));
         }
         return seriesDTOS;
+    }
+
+
+    public List<SeriesDTO> getTop3SeriesByLikeCount() {
+        GroupOperation groupByChapter = Aggregation.group("chapter").count().as("likeCount");
+        GroupOperation groupBySeries = Aggregation.group("series").sum("likeCount").as("totalLikes");
+        SortOperation sortByLikesDesc = Aggregation.sort(Sort.Direction.DESC, "totalLikes");
+        LimitOperation limitTo3 = Aggregation.limit(3);
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                groupByChapter,
+//                groupBySeries,
+                sortByLikesDesc,
+                limitTo3
+        );
+
+        AggregationResults<HotSeries> aggregationResults = mongoTemplate.aggregate(
+                aggregation, "likes", HotSeries.class);
+
+        // Get the top 3 series IDs with highest like counts
+        List<HotSeries> top3SeriesLikes = aggregationResults.getMappedResults();
+        System.out.println(top3SeriesLikes);
+        // sout length
+        System.out.println(top3SeriesLikes.size());
+
+        // Fetch Series objects based on the IDs obtained
+        List<String> top3SeriesIds = top3SeriesLikes.stream()
+                .map(HotSeries::getId)
+                .collect(Collectors.toList());
+        System.out.println(top3SeriesIds);
+        System.out.println();
+
+        List<Series> topHotSeries = mongoTemplate.find(
+                Query.query(Criteria.where("_id").in(top3SeriesIds)),
+                Series.class
+        );
+        System.out.println(topHotSeries);
+
+        return null;
     }
 
     public List<SeriesDTO> getTopRecentCreatedSeries(int page, int size) {

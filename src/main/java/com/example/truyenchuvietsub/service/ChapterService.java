@@ -175,7 +175,7 @@ public class ChapterService {
         Query query = new Query();
         query.addCriteria(Criteria.where("chapter._id").is(chapterId));
         // sort by createdAt
-//        query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
+        query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
         List<Comment> comments = mongoTemplate.find(query, Comment.class, "comments");
         System.out.println(comments);
         return mongoTemplate.find(query, Comment.class).stream().map(CommentDTO::from).collect(Collectors.toList());

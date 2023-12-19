@@ -30,8 +30,10 @@ public class CommentController {
     }
 
     @PostMapping("/create")
-    public void createComment(@RequestBody CommentDTO commentDTO, Authentication authentication) {
-        commentService.createComment(commentDTO, authentication);
+    public ResponseEntity<CommentDTO> createComment(@RequestBody CommentDTO commentDTO, Authentication authentication) {
+        CommentDTO newCommentDTO = commentService.createComment(commentDTO, authentication);
+        return new ResponseEntity<>(newCommentDTO, HttpStatus.OK);
+
     }
 
     @PostMapping("/delete-by-id")

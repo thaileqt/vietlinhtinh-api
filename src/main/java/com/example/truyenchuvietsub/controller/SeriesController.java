@@ -74,6 +74,7 @@ public class SeriesController {
     @GetMapping("/get-hot-series/{seriesCount}")
     public ResponseEntity<List<SeriesDTO>> getTopHotSeries(@PathVariable int seriesCount) {
         List<SeriesDTO> series = seriesService.getTopSeriesWithHighestLikes(seriesCount);
+//        List<SeriesDTO> series = seriesService.getTop3SeriesByLikeCount();
         return new ResponseEntity<>(series, HttpStatus.OK);
     }
 

@@ -20,12 +20,12 @@ public class CommentService {
     @Autowired
     private UserManager userManager;
 
-    public void createComment(CommentDTO commentDTO, Authentication authentication) {
+    public CommentDTO createComment(CommentDTO commentDTO, Authentication authentication) {
         Comment comment = new Comment();
         comment.setChapter(chapterService.getChapterById(commentDTO.getChapterId()).orElseThrow());
         comment.setUser((User) userManager.loadUserByUsername(authentication.getName()));
         comment.setContent(commentDTO.getContent());
-        commentRepository.save(comment);
+        return CommentDTO.from(commentRepository.save(comment));
     }
 
     public CommentDTO getCommentById(String id) {

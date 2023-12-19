@@ -5,6 +5,9 @@ import java.util.regex.Pattern;
 
 public class SlugGenerator {
     public static String toSlug(String str) {
+        if (str == null) {
+            return null;
+        }
         String lowerCase = str.toLowerCase().trim();
         String nfdNormalizedString = Normalizer.normalize(lowerCase, Normalizer.Form.NFD);
         Pattern pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
