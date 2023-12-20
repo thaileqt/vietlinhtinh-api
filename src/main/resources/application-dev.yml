@@ -7,4 +7,4 @@ MONGODB_USERNAME: "tambjet123"
 MONGODB_PASSWORD: "npdoTB7yydG17aPA"
 MONGODB_HOST: "localhost"
 MONGODB_PORT: '27017'
-MONGODB_DB: "truyen-chu"
+MONGODB_DB: "vietlinhtinh"
