@@ -10,9 +10,9 @@ spring:
   data:
     mongodb:
       database: ${MONGODB_DB}
-#      uri: mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@cluster0.unecj4l.mongodb.net/
-      host: ${MONGODB_HOST}
-      port: ${MONGODB_PORT}
+      uri: mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@cluster0.unecj4l.mongodb.net/
+#      host: ${MONGODB_HOST}
+#      port: ${MONGODB_PORT}
 
 logging:
   level:
