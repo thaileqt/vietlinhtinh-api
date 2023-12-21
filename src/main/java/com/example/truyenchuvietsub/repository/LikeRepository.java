@@ -10,6 +10,7 @@ import java.util.List;
 @Repository
 public interface LikeRepository extends MongoRepository<Like, String> {
     boolean existsByChapter_IdAndUser_Id(String chapterId, String userId);
+    boolean existsByChapter_Series_SlugAndChapter_ChapterNumberAndUser_Id(String seriesSlug, int chapterNumber, String userId);
     void deleteByChapter_IdAndUser_Id(String chapterId, String userId);
     List<Like> findAllByChapter_Series_Id(String seriesId);
     List<Like> findAllByChapter_Series(Series series);

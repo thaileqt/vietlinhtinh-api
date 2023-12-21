@@ -35,4 +35,10 @@ public class MarkerController {
         return new ResponseEntity<>(markerDTO, HttpStatus.OK);
     }
 
+    @GetMapping("/get-by-series-slug-and-chapter-number/{seriesSlug}/{chapterNumber}")
+    public ResponseEntity<MarkerDTO> getMarkedParagraphIdsBySeriesSlugAndChapterNumber(@PathVariable("seriesSlug") String seriesSlug, @PathVariable("chapterNumber") int chapterNumber, Authentication authentication) {
+        // TODO
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
 }

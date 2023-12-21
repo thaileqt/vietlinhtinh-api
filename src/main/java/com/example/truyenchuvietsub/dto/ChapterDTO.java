@@ -41,4 +41,20 @@ public class ChapterDTO {
                 .comments(comments)
                 .build();
     }
+
+    public static ChapterDTO from(Chapter chapter, int likeCount) {
+        return ChapterDTO.builder()
+                .id(chapter.getId())
+                .title(chapter.getTitle())
+                .content(chapter.getContent())
+                .seriesSlug(chapter.getSeries().getSlug())
+                .viewCount(chapter.getViewCount())
+                .likeCount(likeCount)
+                .chapterNumber(chapter.getChapterNumber())
+                .createdAt(chapter.getCreatedAt())
+                .updatedAt(chapter.getUpdatedAt())
+                .chapterState(String.valueOf(chapter.getChapterState().getName()))
+                .seriesId(chapter.getSeries().getId())
+                .build();
+    }
 }

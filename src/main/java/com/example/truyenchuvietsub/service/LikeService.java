@@ -49,4 +49,12 @@ public class LikeService {
         String userId = ((User) authentication.getPrincipal()).getId();
         likeRepository.deleteByChapter_IdAndUser_Id(chapterId, userId);
     }
+
+    public boolean isChapterLikedBySeriesSlugAndChapterNumber(String seriesSlug, int chapterNumber, Authentication authentication) {
+        // if anonymous user, return false
+        if (authentication == null) return false;
+        String userId = ((User) authentication.getPrincipal()).getId();
+        String chapterId = chapterService.getChapterBySeriesSlugAndChapterNumber(seriesSlug, chapterNumber).getId();
+        return likeRepository.existsByChapter_IdAndUser_Id(chapterId, userId);
+    }
 }

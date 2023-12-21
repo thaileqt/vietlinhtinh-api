@@ -4,7 +4,7 @@ REFRESH_TOKEN_PRIVATE_KEY_PATH: "access-refresh-token-keys/refresh-token-private
 REFRESH_TOKEN_PUBLIC_KEY_PATH: "access-refresh-token-keys/refresh-token-public.key"
 
 MONGODB_USERNAME: "tambjet123"
-MONGODB_PASSWORD: "npdoTB7yydG17aPA"
+MONGODB_PASSWORD: "lequangthai123"
 MONGODB_HOST: "localhost"
 MONGODB_PORT: '27017'
 MONGODB_DB: "vietlinhtinh"

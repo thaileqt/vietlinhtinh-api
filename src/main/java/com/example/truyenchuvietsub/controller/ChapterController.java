@@ -73,4 +73,10 @@ public class ChapterController {
         return new ResponseEntity<>(count, HttpStatus.OK);
     }
 
+    @GetMapping("/get-chapter-and-adjacent-chapters/{seriesSlug}/{chapterNumber}")
+    public ResponseEntity<List<ChapterDTO>> getChapterAndAdjacentChapters(@PathVariable String seriesSlug, @PathVariable int chapterNumber) {
+        List<ChapterDTO> chapterDTO = chapterService.getChapterAndAdjacentChapters(seriesSlug, chapterNumber);
+        return new ResponseEntity<>(chapterDTO, HttpStatus.OK);
+    }
+
 }

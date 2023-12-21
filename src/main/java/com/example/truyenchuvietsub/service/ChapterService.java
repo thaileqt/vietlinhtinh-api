@@ -95,7 +95,6 @@ public class ChapterService {
         Series series = seriesRepository.findBySlug(SeriesSlug).orElseThrow(() -> new RuntimeException("Series not found"));
         Chapter chapter = chapterRepository.findChapterBySeriesAndChapterNumber(series, chapterNumber)
                 .orElseThrow(() -> new RuntimeException("Chapter not found"));
-        chapter.increaseViewCount();
         chapterRepository.save(chapter);
         return ChapterDTO.from(chapter, countLikeByChapterId(chapter.getId()), getCommentsByChapterId(chapter.getId()));
     }
@@ -111,7 +110,7 @@ public class ChapterService {
 
         query.addCriteria(Criteria.where("series._id").is(series.getId())).with(pageable);
         List<Chapter> chapters = mongoTemplate.find(query, Chapter.class, "chapters");
-        return chapters.stream().map(chapter -> ChapterDTO.from(chapter, countLikeByChapterId(chapter.getId()), getCommentsByChapterId(chapter.getId()))).collect(Collectors.toList());
+        return chapters.stream().map(chapter -> ChapterDTO.from(chapter, 0, null)).collect(Collectors.toList());
     }
 
     public int countChaptersBySeriesSlug(String SeriesSlug) {
@@ -185,4 +184,36 @@ public class ChapterService {
         chapterRepository.save(chapter);
     }
 
+    public List<ChapterDTO> getChapterAndAdjacentChapters(String seriesSlug, int chapterNumber) {
+        Series series = seriesRepository.findBySlug(seriesSlug).orElseThrow(() -> new RuntimeException("Series not found"));
+        Query query = new Query();
+        query.addCriteria(Criteria.where("series._id").is(series.getId())
+                .andOperator(Criteria.where("chapterNumber").gte(chapterNumber - 1).lte(chapterNumber + 1)));
+        // add view count for chapter number
+
+        query.with(Sort.by(Sort.Direction.ASC, "chapterNumber"));
+        List<Chapter> chapters = mongoTemplate.find(query, Chapter.class, "chapters");
+        for (Chapter chapter : chapters) {
+            if (chapter.getChapterNumber() == chapterNumber) {
+                chapter.increaseViewCount();
+                chapterRepository.save(chapter);
+            }
+        }
+        return chapters.stream().map(chapter -> ChapterDTO.from(
+                chapter,
+                countLikeByChapterId(chapter.getId()),
+                getCommentsByChapterId(chapter.getId())))
+                .collect(Collectors.toList());
+    }
+
+    public ChapterDTO getChapter(String seriesSlug, int chapterNumber) {
+        Series series = seriesRepository.findBySlug(seriesSlug).orElseThrow(() -> new RuntimeException("Series not found"));
+        Chapter chapter = chapterRepository.findChapterBySeriesAndChapterNumber(series, chapterNumber)
+                .orElseThrow(() -> new RuntimeException("Chapter not found"));
+        return ChapterDTO.from(
+                chapter,
+                countLikeByChapterId(chapter.getId()),
+                getCommentsByChapterId(chapter.getId())
+        );
+    }
 }

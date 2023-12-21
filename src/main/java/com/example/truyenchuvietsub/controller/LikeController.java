@@ -17,6 +17,11 @@ public class LikeController {
         return likeService.isChapterLiked(chapterId, authentication);
     }
 
+    @GetMapping("/is-chapter-liked-by-series-slug-and-chapter-number/{seriesSlug}/{chapterNumber}")
+    public boolean isLikedBySeriesSlugAndChapterNumber(@PathVariable String seriesSlug, @PathVariable int chapterNumber, Authentication authentication) {
+        return likeService.isChapterLikedBySeriesSlugAndChapterNumber(seriesSlug, chapterNumber, authentication);
+    }
+
     @PostMapping("/like-chapter/{chapterId}")
     public ResponseEntity like(@PathVariable String chapterId, Authentication authentication) {
         likeService.likeChapter(chapterId, authentication);

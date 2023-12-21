@@ -10,7 +10,7 @@ spring:
   data:
     mongodb:
       database: ${MONGODB_DB}
-      uri: mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@cluster0.unecj4l.mongodb.net/
+      uri: mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@vietlinhtinh.isn1rak.mongodb.net/
 #      host: ${MONGODB_HOST}
 #      port: ${MONGODB_PORT}
 
