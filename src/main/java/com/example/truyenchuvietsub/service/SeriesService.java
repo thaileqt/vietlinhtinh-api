@@ -386,6 +386,7 @@ public class SeriesService {
                 chaptersLookupOperation,
                 unwindChaptersOperation,
                 groupOperation,
+                Aggregation.sort(Sort.Direction.DESC, "updatedAt"),
                 Aggregation.skip((long) (page - 1) * size), // Calculate the offset
                 Aggregation.limit(size) // Limit records based on size
         );

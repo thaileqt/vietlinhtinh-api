@@ -200,7 +200,7 @@ public class ChapterService {
         LookupOperation likeLookup = LookupOperation.newLookup()
                 .from("likes")
                 .localField("_id")
-                .foreignField("chapter._id")
+                .foreignField("chapter.$id")
                 .as("likes");
 
         LookupOperation commentLookup = LookupOperation.newLookup()
@@ -212,7 +212,9 @@ public class ChapterService {
         UnwindOperation unwindLikes = Aggregation.unwind("likes", true);
         UnwindOperation unwindComments = Aggregation.unwind("comments", true);
 
-        GroupOperation groupByChapterNumber = Aggregation.group("chapterNumber")
+        GroupOperation groupByChapterNumber = Aggregation.group("_id")
+                // get id of first chapter
+                .first("_id").as("id")
                 .first("chapterNumber").as("chapterNumber")
                 .first("title").as("title")
                 .first("content").as("content")
@@ -221,21 +223,22 @@ public class ChapterService {
                 .first("chapterState").as("chapterState")
                 .first("createdAt").as("createdAt")
                 .first("updatedAt").as("updatedAt")
-                .sum("likes").as("likeCount")
                 .first("series.title").as("seriesTitle")
                 .first("series.cover").as("seriesCover")
+                .addToSet("likes").as("likes")
                 .addToSet("comments").as("comments");
 
         ProjectionOperation project = Aggregation.project()
+                .and("id").as("id")
                 .andExpression("chapterNumber").as("chapterNumber")
                 .andExpression("title").as("title")
                 .andExpression("content").as("content")
                 .andExpression("series").as("series")
-                .andExpression("viewCount").as("viewCount")
                 .andExpression("chapterState").as("chapterState")
                 .andExpression("createdAt").as("createdAt")
                 .andExpression("updatedAt").as("updatedAt")
-                .andExpression("likeCount").as("likeCount")
+                .and("viewCount").as("viewCount")
+                .and("likes").size().as("likeCount")
                 .and("comments").as("comments");
 
         Aggregation aggregation = Aggregation.newAggregation(

@@ -5,6 +5,7 @@ import com.example.truyenchuvietsub.model.ChapterState;
 import com.example.truyenchuvietsub.model.Series;
 import lombok.Builder;
 import lombok.Data;
+import org.bson.types.ObjectId;
 
 import java.util.List;
 
@@ -14,9 +15,9 @@ public class ChapterDetail {
     private String title;
     private String content;
     private SeriesInfo series;
-    private int viewCount;
-    private int likeCount;
-    private int chapterNumber;
+    private Integer viewCount;
+    private Integer likeCount;
+    private Integer chapterNumber;
     private String createdAt;
     private String updatedAt;
     private ChapterState chapterState;
