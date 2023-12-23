@@ -1,7 +1,7 @@
 package com.example.truyenchuvietsub.service;
 
 import com.example.truyenchuvietsub.SlugGenerator;
-import com.example.truyenchuvietsub.dto.series.HotSeries;
+import com.example.truyenchuvietsub.dto.series.*;
 import com.example.truyenchuvietsub.dto.SeriesDTO;
 import com.example.truyenchuvietsub.dto.ReviewDTO;
 import com.example.truyenchuvietsub.dto.UserDTO;
@@ -9,6 +9,7 @@ import com.example.truyenchuvietsub.model.*;
 import com.example.truyenchuvietsub.model.enums.EnumGenre;
 import com.example.truyenchuvietsub.repository.*;
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -42,27 +43,31 @@ public class SeriesService {
     private UserManager userManager;
 
     public List<SeriesDTO> getOwnedSeries(int page, int size, String username) {
+        // count method execution time
+        long startTime = System.currentTimeMillis();
+
         User user = (User) userManager.loadUserByUsername(username);
         PageRequest pageable = PageRequest.of(page, size, Sort.by("updatedAt").descending());
         Query query = new Query(
                 Criteria.where("author._id").is(user.getId())
         ).with(pageable);
 
-        return mongoTemplate.find(query, Series.class).stream().map(
-                Series -> SeriesDTO.builder()
-                        .id(Series.getId())
-                        .title(Series.getTitle())
-                        .slug(Series.getSlug())
-                        .totalChapter(chapterService.countChaptersBySeries_Slug(Series.getSlug()))
-                        .genres(Genre.toGenreStrSet(Series.getGenres()))
-                        .cover(Series.getCover())
-                        .author(UserDTO.from(Series.getAuthor()))
-                        .updatedDate(Series.getUpdatedAt())
-                        .totalView(countTotalViewBySeriesId(Series.getId()))
-                        .totalLike(countTotalLikeBySeriesId(Series.getId()))
-                        .reviews(getReviewsBySeriesId(Series.getId()))
-                        .build()
+        List<Series> seriesList = mongoTemplate.find(query, Series.class);
+        for (Series series : seriesList) {
+            System.out.println(series.getTitle());
+        }
+        // count chapters which has ref to this Series
+        List<SeriesDTO> seriesDTOs = seriesList.stream().map(
+                series -> SeriesDTO.from(
+                        series,
+                        countTotalChapterBySeriesId(series.getId()),
+                        countTotalViewBySeriesId(series.getId()),
+                        countTotalLikeBySeriesId(series.getId()),
+                        getReviewsBySeriesId(series.getId())
+                )
         ).toList();
+        System.out.println("Execution time: " + (System.currentTimeMillis() - startTime) + "ms");
+        return seriesDTOs;
     }
 
     public int countOwnedSeries(String username) {
@@ -73,49 +78,154 @@ public class SeriesService {
         return (int) mongoTemplate.count(query, Series.class);
     }
 
-    public Optional<SeriesDTO> getSeriesBySlug(String slug) {
+    public SeriesDetail getSeriesBySlug(String slug) {
         Series series = seriesRepository.findBySlug(slug).orElseThrow(() -> new RuntimeException("Series not found"));
+        MatchOperation matchOperation = Aggregation.match(Criteria.where("_id").is(new ObjectId(series.getId())));
 
-        // +1 view count
-        int view = series.getView();
-        series.setView(view + 1);
-        seriesRepository.save(series);
-        return seriesRepository.findBySlug(slug).map(
-                Series -> SeriesDTO.from(
-                        Series,
-                        chapterService.countChaptersBySeries_Slug(Series.getSlug()),
-                        countTotalViewBySeriesId(Series.getId()),
-                        countTotalLikeBySeriesId(Series.getId()),
-                        getReviewsBySeriesId(Series.getId())
-                )
+        LookupOperation chaptersLookupOperation = LookupOperation.newLookup()
+                .from("chapters")
+                .localField("_id")
+                .foreignField("series.$id")
+                .as("chapters");
+
+        LookupOperation likesLookupOperation = LookupOperation.newLookup()
+                .from("likes")
+                .localField("chapters._id")
+                .foreignField("chapter.$id")
+                .as("likes");
+
+        LookupOperation reviewsLookupOperation = LookupOperation.newLookup()
+                .from("reviews")
+                .localField("_id")
+                .foreignField("series.$id")
+                .as("reviews");
+
+        UnwindOperation unwindChaptersOperation = Aggregation.unwind("chapters", true);
+        UnwindOperation unwindLikesOperation = Aggregation.unwind("likes", true);
+        UnwindOperation unwindReviewsOperation = Aggregation.unwind("reviews", true);
+
+        // take only 10 lastest chapters
+        SortOperation sortByChapterNumberDesc = Aggregation.sort(Sort.Direction.DESC, "chapters.chapterNumber");
+
+        GroupOperation groupOperation = Aggregation.group("_id")
+                .first("title").as("title")
+                .first("slug").as("slug")
+                .first("author").as("author")
+                .first("description").as("description")
+                .first("cover").as("cover")
+                .first("genres").as("genres")
+                .first("seriesState").as("seriesState")
+                .first("createdAt").as("createdAt")
+                .first("updatedAt").as("updatedAt")
+                .first("view").as("view")
+                .sum("chapters.viewCount").as("totalViews")
+                .addToSet("chapters").as("chapters")
+                .addToSet("likes").as("likes")
+                .addToSet("reviews").as("reviews")
+                .avg("reviews.rating").as("averageRating");
+
+        ProjectionOperation projectOperation = Aggregation.project()
+                .and("title").as("title")
+                .and("slug").as("slug")
+                .and("author").as("author")
+                .and("description").as("description")
+                .and("cover").as("cover")
+                .and("genres").as("genres")
+                .and("seriesState").as("seriesState")
+                .and("createdAt").as("createdAt")
+                .and("updatedAt").as("updatedAt")
+                .andExpression("totalViews + view").as("totalViews")
+                .and("chapters").size().as("totalChapters")
+                .and("likes").size().as("totalLikes")
+                .and("reviews").size().as("totalReviews")
+                .and("averageRating").as("averageRating")
+                .and("reviews").as("reviews");
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                matchOperation,
+                chaptersLookupOperation,
+                unwindChaptersOperation,
+                likesLookupOperation,
+                unwindLikesOperation,
+                reviewsLookupOperation,
+                unwindReviewsOperation,
+                groupOperation,
+                projectOperation
         );
+
+        return mongoTemplate.aggregate(aggregation, "series", SeriesDetail.class).getUniqueMappedResult();
     }
 
-    public List<SeriesDTO> getTopSeriesWithHighestLikes(int seriesCount) {
+    public List<HotSeries> getTopSeriesWithHighestLikes(int seriesCount) {
+
+        LookupOperation chaptersLookupOperation = LookupOperation.newLookup()
+                .from("chapters")
+                .localField("_id")
+                .foreignField("series.$id")
+                .as("chapters");
+
+        LookupOperation likesLookupOperation = LookupOperation.newLookup()
+                .from("likes")
+                .localField("chapters._id")
+                .foreignField("chapter.$id")
+                .as("likes");
+
+        LookupOperation reviewsLookupOperation = LookupOperation.newLookup()
+                .from("reviews")
+                .localField("_id")
+                .foreignField("series.$id")
+                .as("reviews");
+
+        UnwindOperation unwindChaptersOperation = Aggregation.unwind("chapters", true);
+        UnwindOperation unwindLikesOperation = Aggregation.unwind("likes", true);
+        UnwindOperation unwindReviewsOperation = Aggregation.unwind("reviews", true);
+
+        GroupOperation groupOperation = Aggregation.group("_id")
+                .first("title").as("title")
+                .first("slug").as("slug")
+                .first("author").as("author")
+                .first("description").as("description")
+                .first("cover").as("cover")
+                .first("genres").as("genres")
+                .first("seriesState").as("seriesState")
+                .first("createdAt").as("createdAt")
+                .first("updatedAt").as("updatedAt")
+                .first("view").as("view")
+                .sum("chapters.viewCount").as("totalViews")
+                .addToSet("chapters").as("chapters")
+                .addToSet("likes").as("likes")
+                .addToSet("reviews").as("reviews")
+                .avg("reviews.rating").as("averageRating");
+
+
+        ProjectionOperation projectOperation = Aggregation.project()
+                .and("title").as("title")
+                .and("slug").as("slug")
+                .and("author").as("author")
+                .and("cover").as("cover")
+                .and("genres").as("genres")
+                .and("seriesState").as("seriesState")
+                .andExpression("totalViews + view").as("totalViews")
+                .and("chapters").size().as("totalChapters")
+                .and("likes").size().as("totalLikes")
+                .and("averageRating").as("averageRating");
+
+        SortOperation sortByTotalLikes = Aggregation.sort(Sort.Direction.DESC, "totalLikes");
+
+
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.lookup("chapters", "chapter.$id", "_id", "chapter"),
-                Aggregation.unwind("chapter"),
-//                Aggregation.group("chapter.series.$id")
-                Aggregation.group("chapter.series.$id")
-                        .count().as("totalLikes"),
-                Aggregation.sort(Sort.Direction.DESC, "totalLikes"),
-                Aggregation.limit(seriesCount)
+                chaptersLookupOperation,
+                unwindChaptersOperation,
+                likesLookupOperation,
+                unwindLikesOperation,
+                reviewsLookupOperation,
+                unwindReviewsOperation,
+                groupOperation,
+                projectOperation,
+                sortByTotalLikes,
+                Aggregation.limit(seriesCount) // Limit records based on size
         );
-        AggregationResults<Document> result = mongoTemplate.aggregate(aggregation, "likes", Document.class);
-        List<Document> topSeriesWithHighestLikes = result.getMappedResults();
-        List<SeriesDTO> seriesDTOS = new ArrayList<>();
-        for (Document document : topSeriesWithHighestLikes) {
-            Series series = mongoTemplate.findById(document.get("_id"), Series.class);
-            assert series != null;
-            seriesDTOS.add(SeriesDTO.from(
-                    series,
-                    0,
-                    0,
-                    0,
-                    null
-            ));
-        }
-        return seriesDTOS;
+        return mongoTemplate.aggregate(aggregation, "series", HotSeries.class).getMappedResults();
     }
 
 
@@ -157,21 +267,42 @@ public class SeriesService {
         return null;
     }
 
-    public List<SeriesDTO> getTopRecentCreatedSeries(int page, int size) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Query query = new Query().with(pageable);
-        return mongoTemplate.find(query, Series.class).stream().map(
-                Series -> SeriesDTO.builder()
-                        .id(Series.getId())
-                        .title(Series.getTitle())
-                        .slug(Series.getSlug())
-                        .totalChapter(chapterService.countChaptersBySeries_Slug(Series.getSlug()))
-                        .genres(Genre.toGenreStrSet(Series.getGenres()))
-                        .cover(Series.getCover())
-                        .author(UserDTO.from(Series.getAuthor()))
-                        .updatedDate(Series.getUpdatedAt())
-                        .build()
-        ).toList();
+    public List<RecentCreatedSeries> getTopRecentCreatedSeries(int page, int size) {
+        LookupOperation chaptersLookupOperation = LookupOperation.newLookup()
+                .from("chapters")
+                .localField("_id")
+                .foreignField("series.$id")
+                .as("chapters");
+
+        UnwindOperation unwindChaptersOperation = Aggregation.unwind("chapters");
+
+        GroupOperation groupOperation = Aggregation.group("_id")
+                .first("title").as("title")
+                .first("slug").as("slug")
+                .first("author").as("author")
+                .first("cover").as("cover")
+                .first("createdAt").as("createdAt")
+                .addToSet("chapters").as("chapters");
+
+        ProjectionOperation projectOperation = Aggregation.project()
+                .and("title").as("title")
+                .and("slug").as("slug")
+                .and("author").as("author")
+                .and("cover").as("cover")
+                .and("createdAt").as("createdAt")
+                .and("chapters").size().as("totalChapters");
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                chaptersLookupOperation,
+                unwindChaptersOperation,
+                groupOperation,
+                projectOperation,
+                Aggregation.sort(Sort.Direction.DESC, "createdAt"),
+                Aggregation.skip((long) (page - 1) * size), // Calculate the offset
+                Aggregation.limit(size) // Limit records based on size
+        );
+
+        return mongoTemplate.aggregate(aggregation, "series", RecentCreatedSeries.class).getMappedResults();
 
     }
 
@@ -227,21 +358,39 @@ public class SeriesService {
                 )
         ).toList();
     }
-    public List<SeriesDTO> getTopRecentUpdatedSeries(int page, int size) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by("updatedAt").descending());
-        Query query = new Query().with(pageable);
-        return mongoTemplate.find(query, Series.class).stream().map(
-                Series -> SeriesDTO.builder()
-                        .id(Series.getId())
-                        .title(Series.getTitle())
-                        .slug(Series.getSlug())
-                        .totalChapter(chapterService.countChaptersBySeries_Slug(Series.getSlug()))
-                        .genres(Genre.toGenreStrSet(Series.getGenres()))
-                        .cover(Series.getCover())
-                        .author(UserDTO.from(Series.getAuthor()))
-                        .updatedDate(Series.getUpdatedAt())
-                        .build()
-        ).toList();
+    public List<RecentUpdatedSeries> getTopRecentUpdatedSeries(int page, int size) {
+        LookupOperation chaptersLookupOperation = LookupOperation.newLookup()
+                .from("chapters")
+                .localField("_id")
+                .foreignField("series.$id")
+                .as("chapters");
+
+        UnwindOperation unwindChaptersOperation = Aggregation.unwind("chapters");
+
+        GroupOperation groupOperation = Aggregation.group("_id")
+                .first("title").as("title")
+                .first("slug").as("slug")
+                .first("author").as("author")
+                .first("cover").as("cover")
+                .first("description").as("description")
+                .first("genres").as("genres")
+                // get lastest chapter of this series
+                .last("chapters.title").as("chapterTitle")
+                .last("chapters.chapterNumber").as("chapterNumber")
+                .last("chapters._id").as("chapterId")
+                .first("createdAt").as("createdAt")
+                .first("updatedAt").as("updatedAt");
+
+        // just take newest chapter associated with each series
+        Aggregation aggregation = Aggregation.newAggregation(
+                chaptersLookupOperation,
+                unwindChaptersOperation,
+                groupOperation,
+                Aggregation.skip((long) (page - 1) * size), // Calculate the offset
+                Aggregation.limit(size) // Limit records based on size
+        );
+
+        return mongoTemplate.aggregate(aggregation, "series", RecentUpdatedSeries.class).getMappedResults();
     }
 
     public Series updateSeriesBySlug(String Serieslug, SeriesDTO createSeriesRequest) {
@@ -294,9 +443,10 @@ public class SeriesService {
         return totalViewCount.get() + seriesRepository.findById(SeriesId).orElseThrow(() -> new RuntimeException("Series not found")).getView();
     }
 
-    public int countTotalLikeBySeriesId(String SeriesId) {
+    public int countTotalLikeBySeriesId(String seriesId) {
         // get all chapters of this Series
-        List<Chapter> chapters = chapterService.getChaptersBySeries(seriesRepository.findById(SeriesId).orElseThrow(() -> new RuntimeException("Series not found")));
+        List<Chapter> chapters = chapterService.getChaptersBySeries(seriesRepository.findById(seriesId).orElseThrow(() -> new RuntimeException("Series not found")));
+        // get all likes of these chapters
         // get all likes of these chapters
         int totalLikeCount = 0;
         for (Chapter chapter : chapters) {
@@ -305,20 +455,95 @@ public class SeriesService {
         return totalLikeCount;
     }
 
-    public int countTotalChapterBySeriesId(String SeriesId) {
+    public int countTotalChapterBySeriesId(String seriesId) {
         Query query = new Query();
-        query.addCriteria(Criteria.where("Series.$id").is(SeriesId));
+        query.addCriteria(Criteria.where("series.$id").is(seriesId));
         return (int) mongoTemplate.count(query, "chapters");
     }
 
-    public List<ReviewDTO> getReviewsBySeriesId(String SeriesId) {
+    public List<ReviewDTO> getReviewsBySeriesId(String seriesId) {
         Query query = new Query();
-        query.addCriteria(Criteria.where("Series._id").is(SeriesId));
+        query.addCriteria(Criteria.where("series._id").is(seriesId));
         List<Review> reviews = mongoTemplate.find(query, Review.class);
-        List<ReviewDTO> reviewDTOS = new ArrayList<>();
-        for (Review review : reviews) {
-            reviewDTOS.add(ReviewDTO.from(review));
-        }
-        return reviewDTOS;
+        return reviews.stream().map(ReviewDTO::from).toList();
+    }
+
+    public List<UserOwnedSeriesDTO> getSeriesByUsername(String username, int page, int size) {
+        // count method execution time
+        String userId = userRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("User not found")).getId();
+        MatchOperation matchOperation = Aggregation.match(Criteria.where("author.$id").is(new ObjectId(userId)));
+
+        LookupOperation chaptersLookupOperation = LookupOperation.newLookup()
+                .from("chapters")
+                .localField("_id")
+                .foreignField("series.$id")
+                .as("chapters");
+
+        LookupOperation likesLookupOperation = LookupOperation.newLookup()
+                .from("likes")
+                .localField("chapters._id")
+                .foreignField("chapter.$id")
+                .as("likes");
+
+        LookupOperation reviewsLookupOperation = LookupOperation.newLookup()
+                .from("reviews")
+                .localField("_id")
+                .foreignField("series.$id")
+                .as("reviews");
+
+        UnwindOperation unwindChaptersOperation = Aggregation.unwind("chapters", true);
+        UnwindOperation unwindLikesOperation = Aggregation.unwind("likes", true);
+        UnwindOperation unwindReviewsOperation = Aggregation.unwind("reviews", true);
+
+        GroupOperation groupOperation = Aggregation.group("_id")
+                .first("title").as("title")
+                .first("slug").as("slug")
+                .first("author").as("author")
+                .first("description").as("description")
+                .first("cover").as("cover")
+                .first("genres").as("genres")
+                .first("seriesState").as("seriesState")
+                .first("createdAt").as("createdAt")
+                .first("updatedAt").as("updatedAt")
+                .first("view").as("view")
+                .sum("chapters.viewCount").as("totalViews")
+                .addToSet("chapters").as("chapters")
+                .addToSet("likes").as("likes")
+                .addToSet("reviews").as("reviews")
+                .avg("reviews.rating").as("averageRating");
+
+
+        ProjectionOperation projectOperation = Aggregation.project()
+                .and("title").as("title")
+                .and("slug").as("slug")
+                .and("author").as("author")
+                .and("description").as("description")
+                .and("cover").as("cover")
+                .and("genres").as("genres")
+                .and("seriesState").as("seriesState")
+                .and("createdAt").as("createdAt")
+                .and("updatedAt").as("updatedAt")
+                .andExpression("totalViews + view").as("totalViews")
+                .and("chapters").size().as("totalChapters")
+                .and("likes").size().as("totalLikes")
+                .and("reviews").size().as("totalReviews")
+                .and("averageRating").as("averageRating");
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                matchOperation,
+                chaptersLookupOperation,
+                unwindChaptersOperation,
+                likesLookupOperation,
+                unwindLikesOperation,
+                reviewsLookupOperation,
+                unwindReviewsOperation,
+                groupOperation,
+                projectOperation,
+                Aggregation.skip((long) (page - 1) * size), // Calculate the offset
+                Aggregation.limit(size) // Limit records based on size
+        );
+        List<UserOwnedSeriesDTO> result = mongoTemplate.aggregate(aggregation, "series", UserOwnedSeriesDTO.class).getMappedResults();
+        return result;
+
     }
 }

@@ -1,6 +1,7 @@
 package com.example.truyenchuvietsub.controller;
 
 import com.example.truyenchuvietsub.dto.ChapterDTO;
+import com.example.truyenchuvietsub.dto.ChapterDetail;
 import com.example.truyenchuvietsub.dto.CreateChapterRequest;
 import com.example.truyenchuvietsub.model.Chapter;
 import com.example.truyenchuvietsub.service.ChapterService;
@@ -35,7 +36,7 @@ public class ChapterController {
 
     @GetMapping("/get-by-series-slug/{seriesSlug}")
     public ResponseEntity<List<ChapterDTO>> getChaptersBySeriesId(
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @PathVariable String seriesSlug) {
         List<ChapterDTO> chapterDTOs = chapterService.getChaptersBySeriesSlug(seriesSlug, page, size);
@@ -74,8 +75,8 @@ public class ChapterController {
     }
 
     @GetMapping("/get-chapter-and-adjacent-chapters/{seriesSlug}/{chapterNumber}")
-    public ResponseEntity<List<ChapterDTO>> getChapterAndAdjacentChapters(@PathVariable String seriesSlug, @PathVariable int chapterNumber) {
-        List<ChapterDTO> chapterDTO = chapterService.getChapterAndAdjacentChapters(seriesSlug, chapterNumber);
+    public ResponseEntity<List<ChapterDetail>> getChapterAndAdjacentChapters(@PathVariable String seriesSlug, @PathVariable int chapterNumber) {
+        List<ChapterDetail> chapterDTO = chapterService.getChapterAndAdjacentChapters(seriesSlug, chapterNumber);
         return new ResponseEntity<>(chapterDTO, HttpStatus.OK);
     }
 

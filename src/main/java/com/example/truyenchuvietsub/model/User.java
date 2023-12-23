@@ -11,7 +11,6 @@ import java.util.*;
 
 @Document(collection = "users")
 @Data
-@RequiredArgsConstructor
 @NoArgsConstructor
 public class User implements UserDetails {
     @Id
@@ -36,6 +35,14 @@ public class User implements UserDetails {
         this.password = password;
         this.email = email;
         this.name = username;
+        this.cover = "https://cdn.dribbble.com/users/1463082/screenshots/4325775/__________-1.png";
+    }
+    public User(String username, String password, String email, String cover) {
+        this.username = username;
+        this.password = password;
+        this.email = email;
+        this.name = username;
+        this.cover = cover;
     }
 
     @Override

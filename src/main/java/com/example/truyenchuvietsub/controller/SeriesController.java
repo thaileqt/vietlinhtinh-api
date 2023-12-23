@@ -1,6 +1,7 @@
 package com.example.truyenchuvietsub.controller;
 
 import com.example.truyenchuvietsub.dto.SeriesDTO;
+import com.example.truyenchuvietsub.dto.series.*;
 import com.example.truyenchuvietsub.model.Series;
 import com.example.truyenchuvietsub.service.SeriesService;
 import jakarta.validation.Valid;
@@ -37,9 +38,9 @@ public class SeriesController {
     }
 
     @GetMapping("/{slug}")
-    public ResponseEntity<SeriesDTO> getSeriesBySlug(@PathVariable String slug) {
-        Optional<SeriesDTO> Series = seriesService.getSeriesBySlug(slug);
-        return Series.map(value -> new ResponseEntity<>(value, HttpStatus.OK)).orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+    public ResponseEntity<SeriesDetail> getSeriesBySlug(@PathVariable String slug) {
+        SeriesDetail Series = seriesService.getSeriesBySlug(slug);
+        return new ResponseEntity<>(Series, HttpStatus.OK);
     }
 
     @GetMapping("/search?keyword={keyword}")
@@ -55,26 +56,25 @@ public class SeriesController {
     }
 
     @GetMapping("/get-recent-updated-series")
-    public ResponseEntity<List<SeriesDTO>> getTopRecentUpdatedSeries(
-            @RequestParam(defaultValue = "0") int page,
+    public ResponseEntity<List<RecentUpdatedSeries>> getTopRecentUpdatedSeries(
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
-        List<SeriesDTO> series = seriesService.getTopRecentUpdatedSeries(page, size);
+        List<RecentUpdatedSeries> series = seriesService.getTopRecentUpdatedSeries(page, size);
         return new ResponseEntity<>(series, HttpStatus.OK);
     }
 
     @GetMapping("/get-recent-created-series")
-    public ResponseEntity<List<SeriesDTO>> getTopRecentCreatedSeries(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        List<SeriesDTO> series = seriesService.getTopRecentCreatedSeries(page, size);
+    public ResponseEntity<List<RecentCreatedSeries>> getTopRecentCreatedSeries(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        List<RecentCreatedSeries> series = seriesService.getTopRecentCreatedSeries(page, size);
         return new ResponseEntity<>(series, HttpStatus.OK);
     }
 
 
     @GetMapping("/get-hot-series/{seriesCount}")
-    public ResponseEntity<List<SeriesDTO>> getTopHotSeries(@PathVariable int seriesCount) {
-        List<SeriesDTO> series = seriesService.getTopSeriesWithHighestLikes(seriesCount);
-//        List<SeriesDTO> series = seriesService.getTop3SeriesByLikeCount();
+    public ResponseEntity<List<HotSeries>> getTopHotSeries(@PathVariable int seriesCount) {
+        List<HotSeries> series = seriesService.getTopSeriesWithHighestLikes(seriesCount);
         return new ResponseEntity<>(series, HttpStatus.OK);
     }
 
@@ -98,6 +98,15 @@ public class SeriesController {
     public ResponseEntity<Series> updateSeriesBySlug(@PathVariable String slug, @Valid @RequestBody SeriesDTO seriesDTO) {
         Series updatedSeries = seriesService.updateSeriesBySlug(slug, seriesDTO);
         return new ResponseEntity<>(updatedSeries, HttpStatus.OK);
+    }
+
+    @GetMapping("/get-by-username/{username}")
+    public ResponseEntity<List<UserOwnedSeriesDTO>> getSeriesByUsername(
+            @PathVariable String username,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return new ResponseEntity<>(seriesService.getSeriesByUsername(username, page, size), HttpStatus.OK);
     }
 
 

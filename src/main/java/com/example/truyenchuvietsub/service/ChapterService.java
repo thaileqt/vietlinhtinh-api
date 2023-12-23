@@ -1,22 +1,27 @@
 package com.example.truyenchuvietsub.service;
 
 import com.example.truyenchuvietsub.dto.ChapterDTO;
+import com.example.truyenchuvietsub.dto.ChapterDetail;
 import com.example.truyenchuvietsub.dto.CommentDTO;
 import com.example.truyenchuvietsub.dto.CreateChapterRequest;
 import com.example.truyenchuvietsub.model.*;
 import com.example.truyenchuvietsub.repository.ChapterRepository;
 import com.example.truyenchuvietsub.repository.ChapterStateRepository;
 import com.example.truyenchuvietsub.repository.SeriesRepository;
+import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.awt.image.LookupOp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -105,7 +110,7 @@ public class ChapterService {
             int size
     ) {
         Series series = seriesRepository.findBySlug(SeriesSlug).orElseThrow(() -> new RuntimeException("Series not found"));
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "chapterNumber"));
+        PageRequest pageable = PageRequest.of(page-1, size, Sort.by(Sort.Direction.DESC, "chapterNumber"));
         Query query = new Query();
 
         query.addCriteria(Criteria.where("series._id").is(series.getId())).with(pageable);
@@ -184,26 +189,69 @@ public class ChapterService {
         chapterRepository.save(chapter);
     }
 
-    public List<ChapterDTO> getChapterAndAdjacentChapters(String seriesSlug, int chapterNumber) {
+    public List<ChapterDetail> getChapterAndAdjacentChapters(String seriesSlug, int chapterNumber) {
         Series series = seriesRepository.findBySlug(seriesSlug).orElseThrow(() -> new RuntimeException("Series not found"));
-        Query query = new Query();
-        query.addCriteria(Criteria.where("series._id").is(series.getId())
-                .andOperator(Criteria.where("chapterNumber").gte(chapterNumber - 1).lte(chapterNumber + 1)));
-        // add view count for chapter number
 
-        query.with(Sort.by(Sort.Direction.ASC, "chapterNumber"));
-        List<Chapter> chapters = mongoTemplate.find(query, Chapter.class, "chapters");
-        for (Chapter chapter : chapters) {
-            if (chapter.getChapterNumber() == chapterNumber) {
-                chapter.increaseViewCount();
-                chapterRepository.save(chapter);
-            }
-        }
-        return chapters.stream().map(chapter -> ChapterDTO.from(
-                chapter,
-                countLikeByChapterId(chapter.getId()),
-                getCommentsByChapterId(chapter.getId())))
-                .collect(Collectors.toList());
+        MatchOperation match = Aggregation.match(Criteria.where("series.$id").is(new ObjectId(series.getId()))
+                .andOperator(Criteria.where("chapterNumber").gte(chapterNumber - 1).lte(chapterNumber + 1)));
+
+        SortOperation sort = Aggregation.sort(Sort.Direction.ASC, "chapterNumber");
+
+        LookupOperation likeLookup = LookupOperation.newLookup()
+                .from("likes")
+                .localField("_id")
+                .foreignField("chapter._id")
+                .as("likes");
+
+        LookupOperation commentLookup = LookupOperation.newLookup()
+                .from("comments")
+                .localField("_id")
+                .foreignField("chapter.$id")
+                .as("comments");
+
+        UnwindOperation unwindLikes = Aggregation.unwind("likes", true);
+        UnwindOperation unwindComments = Aggregation.unwind("comments", true);
+
+        GroupOperation groupByChapterNumber = Aggregation.group("chapterNumber")
+                .first("chapterNumber").as("chapterNumber")
+                .first("title").as("title")
+                .first("content").as("content")
+                .first("series").as("series")
+                .first("viewCount").as("viewCount")
+                .first("chapterState").as("chapterState")
+                .first("createdAt").as("createdAt")
+                .first("updatedAt").as("updatedAt")
+                .sum("likes").as("likeCount")
+                .first("series.title").as("seriesTitle")
+                .first("series.cover").as("seriesCover")
+                .addToSet("comments").as("comments");
+
+        ProjectionOperation project = Aggregation.project()
+                .andExpression("chapterNumber").as("chapterNumber")
+                .andExpression("title").as("title")
+                .andExpression("content").as("content")
+                .andExpression("series").as("series")
+                .andExpression("viewCount").as("viewCount")
+                .andExpression("chapterState").as("chapterState")
+                .andExpression("createdAt").as("createdAt")
+                .andExpression("updatedAt").as("updatedAt")
+                .andExpression("likeCount").as("likeCount")
+                .and("comments").as("comments");
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                match,
+                likeLookup,
+                unwindLikes,
+                commentLookup,
+                unwindComments,
+                groupByChapterNumber,
+                sort,
+                project
+                // TODO: fix this, comments is empty
+        );
+
+        AggregationResults<ChapterDetail> results = mongoTemplate.aggregate(aggregation, "chapters", ChapterDetail.class);
+        return results.getMappedResults();
     }
 
     public ChapterDTO getChapter(String seriesSlug, int chapterNumber) {
@@ -215,5 +263,15 @@ public class ChapterService {
                 countLikeByChapterId(chapter.getId()),
                 getCommentsByChapterId(chapter.getId())
         );
+    }
+
+    public int countLikeByChapterId2(String chapterId) {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("chapter._id").is(chapterId)),
+                Aggregation.group().count().as("totalLikes")
+        );
+
+        AggregationResults<Document> results = mongoTemplate.aggregate(aggregation, "likes", Document.class);
+        return results.getUniqueMappedResult() != null ? results.getUniqueMappedResult().getInteger("totalLikes") : 0;
     }
 }

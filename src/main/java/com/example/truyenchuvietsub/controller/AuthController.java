@@ -48,7 +48,9 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity register(@RequestBody SignupDTO signupDTO) {
-        User user = new User(signupDTO.getUsername(), signupDTO.getPassword(), signupDTO.getEmail());
+        // if getCover is null, set default cover
+        User user = signupDTO.getCover() != null ? new User(signupDTO.getUsername(), signupDTO.getPassword(), signupDTO.getEmail(), signupDTO.getCover())
+                : new User(signupDTO.getUsername(), signupDTO.getPassword(), signupDTO.getEmail());
         userDetailsManager.createUser(user);
         Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(user, signupDTO.getPassword(), Collections.EMPTY_LIST);
         return ResponseEntity.ok(tokenGenerator.createToken(authentication));

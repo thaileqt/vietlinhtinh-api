@@ -27,7 +27,6 @@ public class Series {
     private int view = 0;
     private Date createdAt = new Date();
     private Date updatedAt;
-    private int totalLike;
     private List<ContentWarning> contentWarnings = new ArrayList<>();
 
     public Series(String title, String description, User author, String cover, SeriesState seriesState) {
