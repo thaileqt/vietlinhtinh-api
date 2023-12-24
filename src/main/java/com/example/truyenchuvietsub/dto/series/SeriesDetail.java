@@ -7,6 +7,7 @@ import com.example.truyenchuvietsub.model.Genre;
 import com.example.truyenchuvietsub.model.SeriesState;
 import lombok.Data;
 
+import java.util.Date;
 import java.util.List;
 
 @Data
@@ -26,4 +27,6 @@ public class SeriesDetail {
     // average rating
     private Double averageRating;
     private List<ReviewDTO> reviews;
+    private Date createdAt;
+    private Date updatedAt;
 }

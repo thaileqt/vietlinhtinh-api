@@ -2,6 +2,7 @@ package com.example.truyenchuvietsub.controller;
 
 import com.example.truyenchuvietsub.dto.ChapterDTO;
 import com.example.truyenchuvietsub.dto.ChapterDetail;
+import com.example.truyenchuvietsub.dto.ChapterList;
 import com.example.truyenchuvietsub.dto.CreateChapterRequest;
 import com.example.truyenchuvietsub.model.Chapter;
 import com.example.truyenchuvietsub.service.ChapterService;
@@ -35,12 +36,12 @@ public class ChapterController {
     }
 
     @GetMapping("/get-by-series-slug/{seriesSlug}")
-    public ResponseEntity<List<ChapterDTO>> getChaptersBySeriesId(
+    public ResponseEntity<List<ChapterList>> getChaptersBySeriesId(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @PathVariable String seriesSlug) {
-        List<ChapterDTO> chapterDTOs = chapterService.getChaptersBySeriesSlug(seriesSlug, page, size);
-        return new ResponseEntity<>(chapterDTOs, HttpStatus.OK);
+        List<ChapterList> chapterList = chapterService.getChaptersBySeriesSlug(seriesSlug, page, size);
+        return new ResponseEntity<>(chapterList, HttpStatus.OK);
     }
 
     @GetMapping("/get-by-series-and-chapter/{seriesSlug}/{chapterNumber}")

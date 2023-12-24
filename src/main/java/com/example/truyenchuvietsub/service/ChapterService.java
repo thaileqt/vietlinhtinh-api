@@ -1,9 +1,6 @@
 package com.example.truyenchuvietsub.service;
 
-import com.example.truyenchuvietsub.dto.ChapterDTO;
-import com.example.truyenchuvietsub.dto.ChapterDetail;
-import com.example.truyenchuvietsub.dto.CommentDTO;
-import com.example.truyenchuvietsub.dto.CreateChapterRequest;
+import com.example.truyenchuvietsub.dto.*;
 import com.example.truyenchuvietsub.model.*;
 import com.example.truyenchuvietsub.repository.ChapterRepository;
 import com.example.truyenchuvietsub.repository.ChapterStateRepository;
@@ -104,18 +101,36 @@ public class ChapterService {
         return ChapterDTO.from(chapter, countLikeByChapterId(chapter.getId()), getCommentsByChapterId(chapter.getId()));
     }
 
-    public List<ChapterDTO> getChaptersBySeriesSlug(
+    public List<ChapterList> getChaptersBySeriesSlug(
             String SeriesSlug,
             int page,
             int size
     ) {
         Series series = seriesRepository.findBySlug(SeriesSlug).orElseThrow(() -> new RuntimeException("Series not found"));
-        PageRequest pageable = PageRequest.of(page-1, size, Sort.by(Sort.Direction.DESC, "chapterNumber"));
-        Query query = new Query();
 
-        query.addCriteria(Criteria.where("series._id").is(series.getId())).with(pageable);
-        List<Chapter> chapters = mongoTemplate.find(query, Chapter.class, "chapters");
-        return chapters.stream().map(chapter -> ChapterDTO.from(chapter, 0, null)).collect(Collectors.toList());
+        MatchOperation match = Aggregation.match(Criteria.where("series.$id").is(new ObjectId(series.getId())));
+        SortOperation sort = Aggregation.sort(Sort.Direction.DESC, "chapterNumber");
+        SkipOperation skip = Aggregation.skip((long) (page - 1) * size);
+        LimitOperation limit = Aggregation.limit(size);
+
+        GroupOperation groupOperation = Aggregation.group("_id")
+                .first("_id").as("id")
+                .first("title").as("title")
+                .first("chapterNumber").as("chapterNumber")
+                .first("createdAt").as("createdAt");
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                match,
+                groupOperation,
+                sort,
+                skip,
+                limit
+        );
+
+        AggregationResults<ChapterList> results = mongoTemplate.aggregate(aggregation, "chapters", ChapterList.class);
+        return results.getMappedResults();
+
+
     }
 
     public int countChaptersBySeriesSlug(String SeriesSlug) {

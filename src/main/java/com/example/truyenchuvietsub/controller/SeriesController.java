@@ -22,36 +22,34 @@ public class SeriesController {
     private SeriesService seriesService;
 
 
-    @GetMapping("/get-user-owned-series/{username}")
-    public ResponseEntity<List<SeriesDTO>> getOwnedseries(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @PathVariable String username) {
-        List<SeriesDTO> series = seriesService.getOwnedSeries(page, size, username);
-        return new ResponseEntity<>(series, HttpStatus.OK);
-    }
-
     @GetMapping("/count-user-owned-series/{username}")
     public ResponseEntity<Integer> countOwnedseries(@PathVariable String username) {
         int count = seriesService.countOwnedSeries(username);
         return new ResponseEntity<>(count, HttpStatus.OK);
     }
 
-    @GetMapping("/{slug}")
+    @GetMapping("/search")
+    public ResponseEntity<List<SeriesDetail>> searchBySlug(
+            // set min length of keyword to 3
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        List<SeriesDetail> series = seriesService.search(keyword, page, size);
+        return new ResponseEntity<>(series, HttpStatus.OK);
+    }
+    @GetMapping("/get-by-slug/{slug}")
     public ResponseEntity<SeriesDetail> getSeriesBySlug(@PathVariable String slug) {
         SeriesDetail Series = seriesService.getSeriesBySlug(slug);
         return new ResponseEntity<>(Series, HttpStatus.OK);
     }
 
-    @GetMapping("/search?keyword={keyword}")
-    public ResponseEntity<List<SeriesDTO>> searchBySlug(@RequestParam String keyword) {
-        List<SeriesDTO> series = seriesService.searchBySlug(keyword);
-        return new ResponseEntity<>(series, HttpStatus.OK);
-    }
 
     @GetMapping("/get-by-genre/{genre}")
-    public ResponseEntity<List<SeriesDTO>> getseriesByGenre(@PathVariable String genre) {
-        List<SeriesDTO> series = seriesService.getSeriesByGenre(genre);
+    public ResponseEntity<List<SeriesDetail>> getseriesByGenre(@PathVariable String genre,
+                                                            @RequestParam(defaultValue = "1") int page,
+                                                            @RequestParam(defaultValue = "10") int size) {
+        List<SeriesDetail> series = seriesService.getSeriesByGenre(genre, page, size);
         return new ResponseEntity<>(series, HttpStatus.OK);
     }
 
@@ -108,6 +106,5 @@ public class SeriesController {
     ) {
         return new ResponseEntity<>(seriesService.getSeriesByUsername(username, page, size), HttpStatus.OK);
     }
-
 
 }

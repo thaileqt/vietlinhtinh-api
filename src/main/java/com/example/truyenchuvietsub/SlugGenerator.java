@@ -20,4 +20,20 @@ public class SlugGenerator {
         String finalResult = resultWithHyphens + "-" + random;
         return finalResult;
     }
+
+    public static String toSlugWithouRandom(String str) {
+        if (str == null) {
+            return null;
+        }
+        String lowerCase = str.toLowerCase().trim();
+        String nfdNormalizedString = Normalizer.normalize(lowerCase, Normalizer.Form.NFD);
+        Pattern pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+        String resultWithoutDiacritics = pattern.matcher(nfdNormalizedString).replaceAll("");
+        String resultWithoutD = resultWithoutDiacritics.replaceAll("đ", "d");
+        String resultWithoutSpecialCharacters = resultWithoutD.replaceAll("[^a-zA-Z0-9\\s]", "");
+        String resultWithHyphens = resultWithoutSpecialCharacters.replaceAll("\\s+", "-");
+
+        String finalResult = resultWithHyphens;
+        return finalResult;
+    }
 }
