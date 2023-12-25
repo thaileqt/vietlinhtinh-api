@@ -35,8 +35,6 @@ public class CharacterController {
         assert userId != null;
         Series series = seriesRepository.findBySlug(characterDTO.getSeriesSlug()).orElseThrow();
         String SeriesUserId = series.getAuthor().getId();
-        System.out.println(SeriesUserId);
-        System.out.println(userId);
 
         if (!SeriesUserId.equals(userId)) {
             return new ResponseEntity<>(HttpStatus.FORBIDDEN);

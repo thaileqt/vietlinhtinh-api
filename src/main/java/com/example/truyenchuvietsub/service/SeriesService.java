@@ -1,17 +1,14 @@
 package com.example.truyenchuvietsub.service;
 
 import com.example.truyenchuvietsub.SlugGenerator;
+import com.example.truyenchuvietsub.dto.ChapterDTO;
 import com.example.truyenchuvietsub.dto.series.*;
 import com.example.truyenchuvietsub.dto.SeriesDTO;
-import com.example.truyenchuvietsub.dto.ReviewDTO;
-import com.example.truyenchuvietsub.dto.UserDTO;
 import com.example.truyenchuvietsub.model.*;
 import com.example.truyenchuvietsub.model.enums.EnumGenre;
 import com.example.truyenchuvietsub.repository.*;
-import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.*;
@@ -20,9 +17,9 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,6 +38,8 @@ public class SeriesService {
     private ChapterService chapterService;
     @Autowired
     private UserManager userManager;
+    @Autowired
+    private ReviewRepository reviewRepository;
 
 
     public int countOwnedSeries(String username) {
@@ -49,6 +48,10 @@ public class SeriesService {
                 Criteria.where("author._id").is(user.getId())
         );
         return (int) mongoTemplate.count(query, Series.class);
+    }
+
+    public int countAllSeries() {
+        return (int) mongoTemplate.count(new Query(), Series.class);
     }
 
     public SeriesDetail getSeriesBySlug(String slug) {
@@ -269,6 +272,7 @@ public class SeriesService {
     }
 
 
+    @Transactional
     public void deleteSeriesById(String id, Authentication authentication) {
 
         Series series = seriesRepository.findById(id).orElseThrow(() -> new RuntimeException("Series not found"));
@@ -276,9 +280,19 @@ public class SeriesService {
         if (!series.getAuthor().getUsername().equals(authentication.getName())) {
             throw new RuntimeException("You are not the author of this Series");
         }
-        // get all chapters of this Series
-        chapterService.deleteAllBySeriesId(id);
-        seriesRepository.deleteById(id);
+
+        // get all chapters of this series
+        List<ChapterDTO> chapters = chapterService.getAllChaptersBySeriesId(id);
+        // delete all chapters
+        for (ChapterDTO chapter : chapters) {
+            chapterService.deleteChapterById(chapter.getId());
+        }
+
+        // Delete associated reviews
+        mongoTemplate.remove(Query.query(Criteria.where("series.$id").is(new ObjectId(series.getId()))), "reviews");
+        mongoTemplate.remove(Query.query(Criteria.where("_id").is(new ObjectId(series.getId()))), "series");
+
+
     }
 
     public List<SeriesDetail> getSeriesByGenre(String genre, int page, int size) {

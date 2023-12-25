@@ -20,7 +20,6 @@ public class LikeService {
 
     public boolean isChapterLiked(String chapterId, Authentication authentication) {
         if (authentication == null) {
-            System.out.println("null");
             return false;
         }
         String userId = ((User) authentication.getPrincipal()).getId();
@@ -45,7 +44,6 @@ public class LikeService {
         if (!(isChapterLiked(chapterId, authentication))) {
             throw new RuntimeException("not liked");
         }
-        System.out.println("unlike");
         String userId = ((User) authentication.getPrincipal()).getId();
         likeRepository.deleteByChapter_IdAndUser_Id(chapterId, userId);
     }

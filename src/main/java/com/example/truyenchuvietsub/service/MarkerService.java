@@ -62,9 +62,7 @@ public class MarkerService {
 
     // get chapter paragraph that match with user markers.chapterParagraph
     public MarkerDTO getUserMarkerInChapter(String chapterId, Authentication authentication) {
-        System.out.println("Chapter Id: " + chapterId);
         User user = (User) authentication.getPrincipal();
-        System.out.println("User Id: " + user.getId());
         // find marker base on chapter Id, if not exist then return null
         Optional<Marker> marker = markerRepository.findByChapter_IdAndUser_Id(chapterId, user.getId());
         if (marker.isEmpty()) {

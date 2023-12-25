@@ -28,6 +28,12 @@ public class SeriesController {
         return new ResponseEntity<>(count, HttpStatus.OK);
     }
 
+    @GetMapping("/count-all-series")
+    public ResponseEntity<Integer> countAllSeries() {
+        int count = seriesService.countAllSeries();
+        return new ResponseEntity<>(count, HttpStatus.OK);
+    }
+
     @GetMapping("/search")
     public ResponseEntity<List<SeriesDetail>> searchBySlug(
             // set min length of keyword to 3

@@ -51,8 +51,8 @@ public class ChapterController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<ChapterDTO> createChapter(@Valid @RequestBody CreateChapterRequest createChapterRequest, Authentication authentication) {
-        ChapterDTO createdChapter = chapterService.createChapter(createChapterRequest, authentication);
+    public ResponseEntity<ChapterDTO> createChapter(@Valid @RequestBody CreateChapterRequest createChapterRequest) {
+        ChapterDTO createdChapter = chapterService.createChapter(createChapterRequest);
         return new ResponseEntity<>(createdChapter, HttpStatus.CREATED);
     }
 

@@ -13,4 +13,6 @@ public interface ReviewRepository extends MongoRepository<Review, String> {
     boolean existsBySeriesAndUser(Series series, User user);
     List<Review> findAllBySeries_Id(String SeriesId);
 
+    void deleteAllBySeries_Id(String SeriesId);
+
 }

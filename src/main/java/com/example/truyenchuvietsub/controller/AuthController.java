@@ -65,7 +65,6 @@ public class AuthController {
                 throw new BadCredentialsException("Invalid username or password");
             }
             User user = (User) userDetailsManager.loadUserByUsername(loginDTO.getUsername());
-            System.out.println(user.getName());
             Token existingToken = tokenRepository.findByUserIdAndTokenType(user.getId(), "access").orElse(null);
             if (existingToken != null) {
                 tokenRepository.delete(existingToken);

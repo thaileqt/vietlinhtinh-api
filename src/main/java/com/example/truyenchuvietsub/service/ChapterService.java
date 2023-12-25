@@ -4,6 +4,7 @@ import com.example.truyenchuvietsub.dto.*;
 import com.example.truyenchuvietsub.model.*;
 import com.example.truyenchuvietsub.repository.ChapterRepository;
 import com.example.truyenchuvietsub.repository.ChapterStateRepository;
+import com.example.truyenchuvietsub.repository.CommentRepository;
 import com.example.truyenchuvietsub.repository.SeriesRepository;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -32,6 +33,8 @@ public class ChapterService {
     private ChapterStateRepository chapterStateRepository;
     @Autowired
     private SeriesRepository seriesRepository;
+    @Autowired
+    private CommentRepository commentRepository;
     @Autowired
     private MongoTemplate mongoTemplate;
 
@@ -63,7 +66,7 @@ public class ChapterService {
         return chapterRepository.findById(chapterId);
     }
 
-    public ChapterDTO createChapter(CreateChapterRequest createChapterRequest, Authentication authentication) {
+    public ChapterDTO createChapter(CreateChapterRequest createChapterRequest) {
         Series series = seriesRepository.findBySlug(createChapterRequest.getSeriesSlug())
                 .orElseThrow(() -> new RuntimeException("Series not found"));
 
@@ -73,20 +76,14 @@ public class ChapterService {
 
         int newChapterNumber = chapterRepository.findTopBySeriesOrderByChapterNumberDesc(series).map(Chapter::getChapterNumber).orElse(0) + 1;
 
-        // create paragraphs
-
         Chapter chapter = new Chapter(series, createChapterRequest.getTitle(), createChapterRequest.getContent(), newChapterNumber);
 
-        // if cant get chaoter status then set it publish
-        if (createChapterRequest.getChapterStatus() == null) {
-            ChapterState chapterState = chapterStateRepository.findByName("PUBLISHED")
-                    .orElseThrow(() -> new RuntimeException("Chapter status not found"));
-            chapter.setChapterState(chapterState);
-        } else {
-            ChapterState chapterState = chapterStateRepository.findByName(createChapterRequest.getChapterStatus().toUpperCase())
-                    .orElseThrow(() -> new RuntimeException("Chapter status not found"));
-            chapter.setChapterState(chapterState);
-        }
+
+
+        ChapterState chapterState = chapterStateRepository.findByName(createChapterRequest.getChapterState().toUpperCase())
+                .orElseThrow(() -> new RuntimeException("Chapter status not found"));
+        chapter.setChapterState(chapterState);
+
         chapterRepository.save(chapter);
         series.setUpdatedAt(new java.util.Date());
         seriesRepository.save(series);
@@ -117,6 +114,7 @@ public class ChapterService {
                 .first("_id").as("id")
                 .first("title").as("title")
                 .first("chapterNumber").as("chapterNumber")
+                .first("chapterState").as("chapterState")
                 .first("createdAt").as("createdAt");
 
         Aggregation aggregation = Aggregation.newAggregation(
@@ -155,8 +153,21 @@ public class ChapterService {
                 .orElseThrow(() -> new RuntimeException("Chapter not found"));
         if (!series.getAuthor().getUsername().equals(SecurityContextHolder.getContext().getAuthentication().getName()))
             throw new RuntimeException("You are not the author of this Series");
+
+        // delete all comments
+        Query queryComment = new Query();
+        queryComment.addCriteria(Criteria.where("chapter._id").is(chapterId));
+        mongoTemplate.remove(queryComment, Comment.class);
+
+        // delete all likes
+        Query query = new Query();
+        query.addCriteria(Criteria.where("chapter._id").is(chapterId));
+        mongoTemplate.remove(query, Like.class);
+
+        // delete chapter
         chapterRepository.deleteById(chapterId);
     }
+
 
     public Chapter updateChapterByChapterNumberAndSeriesSlug(String SeriesSlug, int chapterNumber, ChapterDTO editChapterRequest) {
 
@@ -196,7 +207,6 @@ public class ChapterService {
         // sort by createdAt
         query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
         List<Comment> comments = mongoTemplate.find(query, Comment.class, "comments");
-        System.out.println(comments);
         return mongoTemplate.find(query, Comment.class).stream().map(CommentDTO::from).collect(Collectors.toList());
     }
 

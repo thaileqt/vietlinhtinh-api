@@ -15,5 +15,5 @@ public class CreateChapterRequest {
     private String title;
     private String content;
     private String seriesSlug;
-    private String chapterStatus;
+    private String chapterState;
 }
